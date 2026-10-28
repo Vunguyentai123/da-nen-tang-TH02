@@ -1,22 +1,28 @@
-import React from 'react';
-import { StatusBar, Text, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { StatusBar } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { MessageSquare, Users, Bell, Settings } from 'lucide-react-native';
 
 import LoginScreen from './src/screens/LoginScreen';
+import RegisterScreen from './src/screens/RegisterScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import ContactsScreen from './src/screens/ContactsScreen';
 import NotificationsScreen from './src/screens/NotificationsScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import ChatDetailScreen from './src/screens/ChatDetailScreen';
-import { PRIMARY } from './src/data/mockData';
+
+import { onAuthChange } from './src/services/authService';
+import { setupPresence } from './src/services/userService';
+import { COLORS } from './src/theme/theme';
 
 export type RootStackParamList = {
   Login: undefined;
+  Register: undefined;
   Main: undefined;
-  ChatDetail: { id: string; name: string };
+  ChatDetail: { id: string; name: string; partnerId?: string };
 };
 
 export type MainTabParamList = {
@@ -29,39 +35,36 @@ export type MainTabParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
-const TAB_ICONS: Record<keyof MainTabParamList, string> = {
-  Home: '💬',
-  Contacts: '👥',
-  Notifications: '🔔',
-  Settings: '⚙️',
-};
-
-function makeTabIcon(routeName: keyof MainTabParamList) {
-  const Icon = ({ color, size }: { color: string; size: number }) => (
-    <Text style={[styles.tabIcon, { color, fontSize: size }]}>{TAB_ICONS[routeName]}</Text>
-  );
-  return Icon;
+function HomeTabIcon({ color, size }: { color: string; size: number }) {
+  return <MessageSquare color={color} size={size} />;
 }
 
-const HomeTabIcon = makeTabIcon('Home');
-const ContactsTabIcon = makeTabIcon('Contacts');
-const NotificationsTabIcon = makeTabIcon('Notifications');
-const SettingsTabIcon = makeTabIcon('Settings');
+function ContactsTabIcon({ color, size }: { color: string; size: number }) {
+  return <Users color={color} size={size} />;
+}
+
+function NotificationsTabIcon({ color, size }: { color: string; size: number }) {
+  return <Bell color={color} size={size} />;
+}
+
+function SettingsTabIcon({ color, size }: { color: string; size: number }) {
+  return <Settings color={color} size={size} />;
+}
 
 function MainTabs() {
   return (
     <Tab.Navigator
       screenOptions={{
-        headerStyle: { backgroundColor: PRIMARY },
+        headerStyle: { backgroundColor: COLORS.primary },
         headerTintColor: '#FFFFFF',
-        headerTitleStyle: { fontWeight: 'bold', fontSize: 18 },
+        headerTitleStyle: { fontWeight: '700', fontSize: 18 },
         headerTitleAlign: 'center',
-        tabBarActiveTintColor: PRIMARY,
-        tabBarInactiveTintColor: '#6B7280',
+        tabBarActiveTintColor: COLORS.primary,
+        tabBarInactiveTintColor: COLORS.textMuted,
         tabBarStyle: {
           backgroundColor: '#FFFFFF',
-          borderTopColor: '#E5E7EB',
-          height: 60,
+          borderTopColor: COLORS.border,
+          height: 62,
           paddingBottom: 8,
           paddingTop: 6,
         },
@@ -111,6 +114,28 @@ function MainTabs() {
 }
 
 export default function App() {
+  // Lắng nghe trạng thái đăng nhập để kích hoạt Presence (online/offline)
+  useEffect(() => {
+    let presenceCleanup: (() => void) | null = null;
+
+    const unsubscribeAuth = onAuthChange(user => {
+      if (presenceCleanup) {
+        presenceCleanup();
+        presenceCleanup = null;
+      }
+      if (user) {
+        presenceCleanup = setupPresence(user.uid);
+      }
+    });
+
+    return () => {
+      unsubscribeAuth();
+      if (presenceCleanup) {
+        presenceCleanup();
+      }
+    };
+  }, []);
+
   return (
     <SafeAreaProvider>
       <NavigationContainer>
@@ -119,6 +144,11 @@ export default function App() {
           <Stack.Screen
             name="Login"
             component={LoginScreen}
+            options={{ headerShown: false }}
+          />
+          <Stack.Screen
+            name="Register"
+            component={RegisterScreen}
             options={{ headerShown: false }}
           />
           <Stack.Screen
@@ -131,9 +161,9 @@ export default function App() {
             component={ChatDetailScreen}
             options={({ route }) => ({
               title: route.params.name,
-              headerStyle: { backgroundColor: PRIMARY },
+              headerStyle: { backgroundColor: COLORS.primary },
               headerTintColor: '#FFFFFF',
-              headerTitleStyle: { fontWeight: 'bold' },
+              headerTitleStyle: { fontWeight: '700' },
               headerBackTitle: 'Quay lại',
             })}
           />
@@ -142,9 +172,3 @@ export default function App() {
     </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  tabIcon: {
-    fontSize: 20,
-  },
-});

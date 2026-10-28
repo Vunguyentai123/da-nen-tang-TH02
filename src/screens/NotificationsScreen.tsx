@@ -6,7 +6,9 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { initialNotifications, AppNotification, PRIMARY } from '../data/mockData';
+import { Check, BellOff } from 'lucide-react-native';
+import { initialNotifications, AppNotification } from '../data/mockData';
+import { COLORS, SHADOWS } from '../theme/theme';
 
 export default function NotificationsScreen() {
   const [list, setList] = useState<AppNotification[]>(initialNotifications);
@@ -54,11 +56,13 @@ export default function NotificationsScreen() {
       <View style={styles.cardFooter}>
         {item.read ? (
           <View style={styles.readStatusBox}>
-            <Text style={styles.readStatusText}>✓ Đã đọc</Text>
+            <Check size={14} color={COLORS.textMuted} style={styles.checkIcon} />
+            <Text style={styles.readStatusText}>Đã đọc</Text>
           </View>
         ) : (
           <TouchableOpacity
             style={styles.markReadButton}
+            activeOpacity={0.8}
             onPress={() => markAsRead(item.id)}>
             <Text style={styles.markReadButtonText}>Đánh dấu đã đọc</Text>
           </TouchableOpacity>
@@ -78,7 +82,7 @@ export default function NotificationsScreen() {
                 Bạn có <Text style={styles.highlight}>{unreadCount}</Text> thông báo chưa đọc
               </>
             ) : (
-              'Bạn đã đọc hết tất cả thông báo 🎉'
+              'Bạn đã đọc hết tất cả thông báo'
             )}
           </Text>
         </View>
@@ -86,6 +90,7 @@ export default function NotificationsScreen() {
         {unreadCount > 0 && (
           <TouchableOpacity
             style={styles.markAllButton}
+            activeOpacity={0.8}
             onPress={markAllAsRead}>
             <Text style={styles.markAllText}>Đọc tất cả</Text>
           </TouchableOpacity>
@@ -100,7 +105,9 @@ export default function NotificationsScreen() {
         contentContainerStyle={styles.listContent}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🔔</Text>
+            <View style={styles.emptyIconCircle}>
+              <BellOff size={36} color={COLORS.textMuted} />
+            </View>
             <Text style={styles.emptyTitle}>Chưa có thông báo nào</Text>
             <Text style={styles.emptySubtitle}>
               Khi có thông báo mới từ bạn bè hoặc hệ thống, chúng sẽ xuất hiện ở đây.
@@ -115,7 +122,7 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.background,
   },
   topToolbar: {
     flexDirection: 'row',
@@ -123,50 +130,52 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
     borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
+    borderBottomColor: COLORS.border,
   },
   countContainer: {
     flex: 1,
   },
   countText: {
     fontSize: 13,
-    color: '#4B5563',
+    color: COLORS.textSecondary,
+    fontWeight: '500',
   },
   highlight: {
-    color: '#EF4444',
-    fontWeight: 'bold',
+    color: COLORS.danger,
+    fontWeight: '700',
   },
   markAllButton: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#BFDBFE',
+    borderColor: COLORS.primaryBorder,
   },
   markAllText: {
-    color: PRIMARY,
+    color: COLORS.primary,
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
   listContent: {
     padding: 16,
   },
   card: {
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 10,
     borderWidth: 1,
+    ...SHADOWS.card,
   },
   cardUnread: {
-    backgroundColor: '#FFFFFF',
-    borderColor: '#93C5FD',
+    backgroundColor: COLORS.card,
+    borderColor: COLORS.primaryBorder,
   },
   cardRead: {
     backgroundColor: '#FAFAFA',
-    borderColor: '#E5E7EB',
+    borderColor: COLORS.border,
   },
   cardHeader: {
     flexDirection: 'row',
@@ -184,23 +193,23 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: PRIMARY,
-    marginRight: 6,
+    backgroundColor: COLORS.primary,
+    marginRight: 8,
   },
   cardTitle: {
     fontSize: 15,
   },
   titleUnread: {
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   titleRead: {
     fontWeight: '600',
-    color: '#6B7280',
+    color: COLORS.textSecondary,
   },
   timeText: {
     fontSize: 12,
-    color: '#9CA3AF',
+    color: COLORS.textMuted,
   },
   contentText: {
     fontSize: 14,
@@ -208,32 +217,37 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   contentUnread: {
-    color: '#374151',
+    color: COLORS.textPrimary,
     fontWeight: '500',
   },
   contentRead: {
-    color: '#6B7280',
+    color: COLORS.textSecondary,
   },
   cardFooter: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
   },
   markReadButton: {
-    backgroundColor: PRIMARY,
+    backgroundColor: COLORS.primary,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 6,
+    borderRadius: 8,
   },
   markReadButtonText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   readStatusBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: 4,
   },
+  checkIcon: {
+    marginRight: 4,
+  },
   readStatusText: {
-    color: '#9CA3AF',
+    color: COLORS.textMuted,
     fontSize: 12,
     fontStyle: 'italic',
   },
@@ -243,19 +257,24 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 32,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.surfaceSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
+    fontWeight: '700',
+    color: COLORS.textPrimary,
     marginBottom: 6,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: COLORS.textMuted,
     textAlign: 'center',
     lineHeight: 18,
   },

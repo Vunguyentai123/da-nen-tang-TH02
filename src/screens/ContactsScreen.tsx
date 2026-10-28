@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,17 @@ import {
   FlatList,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
 } from 'react-native';
 import { BottomTabScreenProps } from '@react-navigation/bottom-tabs';
 import { CompositeScreenProps } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Search, X, Users, MessageSquare } from 'lucide-react-native';
 import { MainTabParamList, RootStackParamList } from '../../App';
-import { users, User } from '../data/mockData';
+import { getCurrentUser, UserProfile } from '../services/authService';
+import { subscribeToUsers } from '../services/userService';
 import Avatar from '../components/Avatar';
+import { COLORS } from '../theme/theme';
 
 type Props = CompositeScreenProps<
   BottomTabScreenProps<MainTabParamList, 'Contacts'>,
@@ -23,44 +27,51 @@ function ContactsSeparator() {
   return <View style={styles.separator} />;
 }
 
-function ContactsEmpty() {
-  return (
-    <View style={styles.emptyContainer}>
-      <Text style={styles.emptyIcon}>👥</Text>
-      <Text style={styles.emptyTitle}>Không tìm thấy người dùng</Text>
-      <Text style={styles.emptySubtitle}>
-        Không có liên hệ nào trùng khớp với từ khóa tìm kiếm.
-      </Text>
-    </View>
-  );
-}
-
 export default function ContactsScreen({ navigation }: Props) {
+  const [users, setUsers] = useState<UserProfile[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const currentUser = getCurrentUser();
+    const currentUid = currentUser?.uid || '';
+
+    // Lắng nghe danh bạ người dùng từ Firebase (không gồm bản thân)
+    const unsubscribe = subscribeToUsers(currentUid, userList => {
+      setUsers(userList);
+      setLoading(false);
+    });
+
+    // Cleanup listener khi unmount để không bị memory leak hay lặp dữ liệu
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const filtered = users.filter(
     u =>
       u.name.toLowerCase().includes(search.toLowerCase()) ||
-      (u.phone && u.phone.includes(search)) ||
-      (u.email && u.email.toLowerCase().includes(search.toLowerCase())),
+      u.email.toLowerCase().includes(search.toLowerCase()),
   );
 
-  const openUserChat = (user: User) => {
-    // Điều hướng sang ChatDetail tương ứng với người dùng
-    const parent = navigation.getParent<NativeStackScreenProps<RootStackParamList>['navigation']>();
+  const openUserChat = (user: UserProfile) => {
+    const parent =
+      navigation.getParent<NativeStackScreenProps<RootStackParamList>['navigation']>();
     parent?.navigate('ChatDetail', {
-      id: `u_${user.id}`,
+      id: user.uid,
       name: user.name,
+      partnerId: user.uid,
     });
   };
 
-  const renderItem = ({ item }: { item: User }) => (
+  const onlineCount = users.filter(u => u.online).length;
+
+  const renderItem = ({ item }: { item: UserProfile }) => (
     <View style={styles.contactItem}>
       <TouchableOpacity
         style={styles.contactMain}
         activeOpacity={0.7}
         onPress={() => openUserChat(item)}>
-        {/* Avatar là chữ cái đầu của tên */}
         <Avatar
           name={item.name}
           size={50}
@@ -69,7 +80,9 @@ export default function ContactsScreen({ navigation }: Props) {
         />
 
         <View style={styles.contactInfo}>
-          <Text style={styles.userName}>{item.name}</Text>
+          <Text style={styles.userName} numberOfLines={1}>
+            {item.name}
+          </Text>
           <View style={styles.statusRow}>
             <View
               style={[
@@ -85,36 +98,40 @@ export default function ContactsScreen({ navigation }: Props) {
               {item.online ? 'Đang hoạt động' : 'Ngoại tuyến'}
             </Text>
           </View>
-          {item.phone ? <Text style={styles.phoneText}>{item.phone}</Text> : null}
+          {item.email ? (
+            <Text style={styles.emailText} numberOfLines={1}>
+              {item.email}
+            </Text>
+          ) : null}
         </View>
       </TouchableOpacity>
 
       <TouchableOpacity
         style={styles.chatButton}
+        activeOpacity={0.8}
         onPress={() => openUserChat(item)}>
+        <MessageSquare size={14} color={COLORS.primary} style={styles.chatButtonIcon} />
         <Text style={styles.chatButtonText}>Nhắn tin</Text>
       </TouchableOpacity>
     </View>
   );
 
-  const onlineCount = users.filter(u => u.online).length;
-
   return (
     <View style={styles.container}>
       {/* Ô tìm kiếm danh bạ */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Search size={16} color={COLORS.textMuted} style={styles.searchIcon} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Tìm theo tên, số điện thoại..."
-          placeholderTextColor="#9CA3AF"
+          placeholder="Tìm theo tên hoặc email..."
+          placeholderTextColor={COLORS.textMuted}
           value={search}
           onChangeText={setSearch}
           clearButtonMode="while-editing"
         />
         {search.length > 0 && (
           <TouchableOpacity onPress={() => setSearch('')}>
-            <Text style={styles.clearIcon}>✕</Text>
+            <X size={16} color={COLORS.textMuted} />
           </TouchableOpacity>
         )}
       </View>
@@ -122,20 +139,40 @@ export default function ContactsScreen({ navigation }: Props) {
       {/* Thanh thống kê trạng thái */}
       <View style={styles.statusBar}>
         <Text style={styles.statusBarText}>
-          Tổng số: <Text style={styles.bold}>{users.length}</Text> bạn bè (
-          <Text style={styles.onlineHighlight}>{onlineCount} đang online</Text>)
+          Tổng số: <Text style={styles.bold}>{users.length}</Text> bạn bè •{' '}
+          <Text style={styles.onlineHighlight}>{onlineCount} đang online</Text>
         </Text>
       </View>
 
-      {/* Danh sách người dùng */}
-      <FlatList
-        data={filtered}
-        keyExtractor={item => item.id}
-        renderItem={renderItem}
-        contentContainerStyle={styles.listContent}
-        ItemSeparatorComponent={ContactsSeparator}
-        ListEmptyComponent={ContactsEmpty}
-      />
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+          <Text style={styles.loadingText}>Đang tải danh bạ từ Firebase...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={item => item.uid}
+          renderItem={renderItem}
+          contentContainerStyle={styles.listContent}
+          ItemSeparatorComponent={ContactsSeparator}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <View style={styles.emptyIconCircle}>
+                <Users size={36} color={COLORS.textMuted} />
+              </View>
+              <Text style={styles.emptyTitle}>
+                {search ? 'Không tìm thấy người dùng phù hợp' : 'Chưa có liên hệ nào'}
+              </Text>
+              <Text style={styles.emptySubtitle}>
+                {search
+                  ? 'Thử tìm với từ khóa hoặc email khác.'
+                  : 'Hãy tạo tài khoản khác hoặc rủ bạn bè đăng ký để bắt đầu nhắn tin!'}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -143,51 +180,58 @@ export default function ContactsScreen({ navigation }: Props) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: COLORS.card,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.surfaceSubtle,
     marginHorizontal: 16,
-    marginTop: 10,
-    marginBottom: 6,
-    paddingHorizontal: 12,
-    borderRadius: 12,
+    marginTop: 12,
+    marginBottom: 8,
+    paddingHorizontal: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   searchIcon: {
-    fontSize: 14,
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
     paddingVertical: 10,
     fontSize: 14,
-    color: '#1F2937',
-  },
-  clearIcon: {
-    fontSize: 14,
-    color: '#9CA3AF',
-    paddingHorizontal: 4,
+    color: COLORS.textPrimary,
   },
   statusBar: {
     paddingHorizontal: 16,
     paddingVertical: 8,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: COLORS.background,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
+    borderBottomColor: COLORS.border,
   },
   statusBarText: {
     fontSize: 12,
-    color: '#6B7280',
+    color: COLORS.textSecondary,
   },
   bold: {
-    fontWeight: 'bold',
-    color: '#111827',
+    fontWeight: '700',
+    color: COLORS.textPrimary,
   },
   onlineHighlight: {
-    color: '#059669',
-    fontWeight: '600',
+    color: COLORS.online,
+    fontWeight: '700',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: COLORS.textSecondary,
   },
   listContent: {
     flexGrow: 1,
@@ -196,7 +240,7 @@ const styles = StyleSheet.create({
   contactItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: 14,
   },
   contactMain: {
     flex: 1,
@@ -210,57 +254,62 @@ const styles = StyleSheet.create({
   },
   userName: {
     fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
-    marginBottom: 3,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginBottom: 2,
   },
   statusRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   statusDot: {
-    width: 7,
-    height: 7,
+    width: 8,
+    height: 8,
     borderRadius: 4,
     marginRight: 6,
   },
   statusDotOnline: {
-    backgroundColor: '#10B981',
+    backgroundColor: COLORS.online,
   },
   statusDotOffline: {
-    backgroundColor: '#9CA3AF',
+    backgroundColor: COLORS.offline,
   },
   statusText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  statusOnline: {
-    color: '#059669',
-  },
-  statusOffline: {
-    color: '#6B7280',
-  },
-  phoneText: {
-    fontSize: 12,
-    color: '#9CA3AF',
-    marginTop: 2,
-  },
-  chatButton: {
-    backgroundColor: '#EFF6FF',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#BFDBFE',
-  },
-  chatButtonText: {
-    color: '#2563EB',
     fontSize: 12,
     fontWeight: '600',
   },
+  statusOnline: {
+    color: COLORS.online,
+  },
+  statusOffline: {
+    color: COLORS.textMuted,
+  },
+  emailText: {
+    fontSize: 12,
+    color: COLORS.textMuted,
+    marginTop: 2,
+  },
+  chatButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: COLORS.primaryBorder,
+  },
+  chatButtonIcon: {
+    marginRight: 4,
+  },
+  chatButtonText: {
+    color: COLORS.primary,
+    fontSize: 13,
+    fontWeight: '700',
+  },
   separator: {
     height: 1,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: COLORS.borderLight,
     marginLeft: 64,
   },
   emptyContainer: {
@@ -269,19 +318,26 @@ const styles = StyleSheet.create({
     paddingVertical: 60,
     paddingHorizontal: 32,
   },
-  emptyIcon: {
-    fontSize: 48,
-    marginBottom: 12,
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.surfaceSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
   },
   emptyTitle: {
     fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
+    fontWeight: '700',
+    color: COLORS.textPrimary,
     marginBottom: 6,
+    textAlign: 'center',
   },
   emptySubtitle: {
     fontSize: 13,
-    color: '#9CA3AF',
+    color: COLORS.textMuted,
     textAlign: 'center',
+    lineHeight: 18,
   },
 });
